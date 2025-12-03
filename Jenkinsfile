@@ -2,64 +2,47 @@ pipeline {
     agent any
     
     stages {
-        stage('Docker Login') {
+        stage('Debug Workspace') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
-                                                 usernameVariable: 'DOCKER_USER', 
-                                                 passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                    echo $DOCKER_PASS | /usr/local/bin/docker login -u $DOCKER_USER --password-stdin
-                    echo "✅ Docker Hub login successful"
-                    '''
-                }
+                sh '''
+                echo "=== WORKSPACE FILES ==="
+                pwd
+                ls -la
+                cat Dockerfile | head -5
+                echo "=== END FILES ==="
+                '''
             }
         }
         
-        stage('Build') {
+        stage('Test Build ONLY') {
             steps {
                 sh '''
-                DOCKER_BUILDKIT=0 /usr/local/bin/docker build --no-cache -t hello-world-django-app:${BUILD_NUMBER} .
-                echo "✅ Docker image built: hello-world-django-app:${BUILD_NUMBER}"
+                echo "=== BUILDING IMAGE ==="
+                DOCKER_BUILDKIT=0 /usr/local/bin/docker build \
+                  --no-cache --pull=false \
+                  -t hello-world-django-app:test .
+                echo "✅ BUILD SUCCESS!"
                 /usr/local/bin/docker images | grep hello-world-django-app
                 '''
             }
         }
         
-        stage('Health Check') {
+        stage('Test Health Check') {
             steps {
                 sh '''
-                /usr/local/bin/docker run --rm hello-world-django-app:${BUILD_NUMBER} python manage.py check --deploy
-                echo "✅ Django health check PASSED"
+                /usr/local/bin/docker run --rm hello-world-django-app:test python manage.py check --deploy
+                echo "✅ HEALTH CHECK PASSED!"
                 '''
-            }
-        }
-        
-        stage('Deploy') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
-                                                 usernameVariable: 'DOCKER_USER', 
-                                                 passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                    /usr/local/bin/docker tag hello-world-django-app:${BUILD_NUMBER} $DOCKER_USER/hello-world-django-app:${BUILD_NUMBER}
-                    /usr/local/bin/docker tag hello-world-django-app:${BUILD_NUMBER} $DOCKER_USER/hello-world-django-app:latest
-                    /usr/local/bin/docker push $DOCKER_USER/hello-world-django-app:${BUILD_NUMBER}
-                    /usr/local/bin/docker push $DOCKER_USER/hello-world-django-app:latest
-                    echo "✅ Pushed to Docker Hub: $DOCKER_USER/hello-world-django-app:${BUILD_NUMBER}"
-                    '''
-                }
             }
         }
     }
     
     post {
-        always {
-            sh '/usr/local/bin/docker system prune -f || true'
-        }
         success {
-            echo '🎉 FULL DJANGO CI/CD PIPELINE SUCCESS! 🚀'
+            echo '🎉 BUILD + HEALTH CHECK WORKS! Ready for Docker Hub push 🚀'
         }
-        failure {
-            echo '❌ Pipeline failed - check logs above'
+        always {
+            sh '/usr/local/bin/docker rmi hello-world-django-app:test || true'
         }
     }
 }
