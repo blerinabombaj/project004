@@ -1,0 +1,24 @@
+# Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database & Secrets
+db.sqlite3
+.env
+*.env
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# OS & Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs & Temp
+*.log
+tmp/
+temp/
