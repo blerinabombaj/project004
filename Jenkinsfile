@@ -47,22 +47,21 @@ pipeline {
                     sh '''
                     echo "Updating task definition..."
                     sed -e "s|IMAGE_PLACEHOLDER|$ECR_REGISTRY/$ECR_REPOSITORY:${BUILD_NUMBER}|g" task-definition.json > task-definition-updated.json
+                    cat task-definition-updated.json | grep -E "(family|image)"
                     
-                    echo "Registering new task definition..."
-                    TASK_REVISION=$(${AWS_CLI} ecs register-task-definition --cli-input-json file://task-definition-updated.json --query 'taskDefinition.revision' --output text)
-                    TASK_ARN=$(${AWS_CLI} ecs describe-task-definition --task-definition project004:$TASK_REVISION --query 'taskDefinition.taskDefinitionArn' --output text)
+                    TASK_REVISION=$(${AWS_CLI} ecs register-task-definition --cli-input-json file://task-definition-updated.json --query "taskDefinition.revision" --output text)
+                    TASK_FAMILY=$(${AWS_CLI} ecs register-task-definition --cli-input-json file://task-definition-updated.json --query "taskDefinition.family" --output text)
                     
-                    echo "Updating ECS service with ARN: $TASK_ARN"
-                    ${AWS_CLI} ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $TASK_ARN
+                    echo "Deploying $TASK_FAMILY:$TASK_REVISION to $ECS_CLUSTER/$ECS_SERVICE"
+                    ${AWS_CLI} ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition "$TASK_FAMILY:$TASK_REVISION"
                     
-                    echo "Waiting for deployment..."
-                    sleep 30
-                    
-                    echo "✅ ECS Deployed! Check AWS Console: ECS > django-cluster > django-service"
+                    echo "Waiting for rollout..."
+                    sleep 45
+                    echo "✅ ECS DEPLOY COMPLETE! Check AWS Console."
                     '''
                 }
             }
-        }  // ← FIXED: Added missing closing brace
+        }
     }
     post {
         always {
