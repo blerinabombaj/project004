@@ -46,7 +46,9 @@ pipeline {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr']]) {
                     sh '''
                     echo "Updating task definition..."
+                    # Changed family from "django-task" to "django-service" in task-definition.json
                     sed -e "s|IMAGE_PLACEHOLDER|$ECR_REGISTRY/$ECR_REPOSITORY:${BUILD_NUMBER}|g" task-definition.json > task-definition-updated.json
+                    sed -i '' 's/"family": "django-task"/"family": "django-service"/g' task-definition-updated.json  # <-- CHANGE HERE
                     cat task-definition-updated.json | grep -E "(family|image)"
                     
                     TASK_REVISION=$(${AWS_CLI} ecs register-task-definition --cli-input-json file://task-definition-updated.json --query "taskDefinition.revision" --output text)
