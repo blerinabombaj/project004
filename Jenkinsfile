@@ -2,47 +2,52 @@ pipeline {
     agent any
     
     stages {
-        stage('Debug Workspace') {
+        stage('Build') {
             steps {
                 sh '''
-                echo "=== WORKSPACE FILES ==="
-                pwd
-                ls -la
-                cat Dockerfile | head -5
-                echo "=== END FILES ==="
-                '''
-            }
-        }
-        
-        stage('Test Build ONLY') {
-            steps {
-                sh '''
-                echo "=== BUILDING IMAGE ==="
-                DOCKER_BUILDKIT=0 /usr/local/bin/docker build \
-                  --no-cache --pull=false \
-                  -t hello-world-django-app:test .
-                echo "✅ BUILD SUCCESS!"
+                echo "Building Docker image..."
+                DOCKER_BUILDKIT=0 /usr/local/bin/docker build --no-cache -t hello-world-django-app:${BUILD_NUMBER} .
                 /usr/local/bin/docker images | grep hello-world-django-app
                 '''
             }
         }
         
-        stage('Test Health Check') {
+        stage('Test') {
             steps {
                 sh '''
-                /usr/local/bin/docker run --rm hello-world-django-app:test python manage.py check --deploy
-                echo "✅ HEALTH CHECK PASSED!"
+                echo "Running Django health check..."
+                /usr/local/bin/docker run --rm hello-world-django-app:${BUILD_NUMBER} python manage.py check --deploy
                 '''
+            }
+        }
+        
+        stage('Docker Hub Push') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
+                                                 usernameVariable: 'DOCKER_USER', 
+                                                 passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo "Logging into Docker Hub..."
+                    echo $DOCKER_PASS | /usr/local/bin/docker login -u $DOCKER_USER --password-stdin
+                    
+                    echo "Tagging images..."
+                    /usr/local/bin/docker tag hello-world-django-app:${BUILD_NUMBER} $DOCKER_USER/hello-world-django-app:${BUILD_NUMBER}
+                    /usr/local/bin/docker tag hello-world-django-app:${BUILD_NUMBER} $DOCKER_USER/hello-world-django-app:latest
+                    
+                    echo "Pushing to Docker Hub..."
+                    /usr/local/bin/docker push $DOCKER_USER/hello-world-django-app:${BUILD_NUMBER}
+                    /usr/local/bin/docker push $DOCKER_USER/hello-world-django-app:latest
+                    
+                    echo "✅ FULL SUCCESS - Docker Hub LIVE!"
+                    '''
+                }
             }
         }
     }
     
     post {
-        success {
-            echo '🎉 BUILD + HEALTH CHECK WORKS! Ready for Docker Hub push 🚀'
-        }
         always {
-            sh '/usr/local/bin/docker rmi hello-world-django-app:test || true'
+            sh '/usr/local/bin/docker system prune -f || true'
         }
     }
 }
