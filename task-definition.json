@@ -4,7 +4,7 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::444062204470:role/ecsTaskExecutionRole",  // <-- Paste your ECS Task Role ARN here
+  "executionRoleArn": "arn:aws:iam::444062204470:role/ecsTaskExecutionRole",  
   "containerDefinitions": [{
     "name": "django-app",
     "image": "IMAGE_PLACEHOLDER",
@@ -14,7 +14,7 @@
       "logDriver": "awslogs",
       "options": {
         "awslogs-group": "/ecs/django-task",
-        "awslogs-region": "eu-north-1",             // <-- Match this region to AWS_REGION
+        "awslogs-region": "eu-north-1",          
         "awslogs-stream-prefix": "ecs"
       }
     }
