@@ -22,10 +22,8 @@ pipeline {
         }
         stage('ECR Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-ecr', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr']]) {
                     sh '''
-                    export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-                    export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
                     aws ecr get-login-password --region $AWS_REGION | /usr/local/bin/docker login --username AWS --password-stdin $ECR_REGISTRY
                     
                     IMAGE_TAG=${BUILD_NUMBER}
@@ -33,19 +31,19 @@ pipeline {
                     /usr/local/bin/docker tag hello-world-django-app:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
                     /usr/local/bin/docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
                     /usr/local/bin/docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+                    echo "✅ ECR Push Complete!"
                     '''
                 }
             }
         }
         stage('ECS Deploy') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-ecr', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr']]) {
                     sh '''
-                    export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-                    export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
                     sed -e "s|IMAGE_PLACEHOLDER|$ECR_REGISTRY/$ECR_REPOSITORY:${BUILD_NUMBER}|g" task-definition.json > task-definition-updated.json
                     TASK_REVISION=$(aws ecs register-task-definition --cli-input-json file://task-definition-updated.json --query 'taskDefinition.revision' --output text)
                     aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $ECR_REPOSITORY:$TASK_REVISION
+                    echo "✅ ECS Deployed! Check AWS Console."
                     '''
                 }
             }
